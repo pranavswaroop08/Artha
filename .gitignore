@@ -25,6 +25,8 @@ data/
 *.sqlite
 raw_lake/
 feature_store/.feast/
+# Exception: track the source code under src/data (it is code, not data)
+!src/data/
 
 # ML artifacts
 mlruns/
