@@ -1,0 +1,53 @@
+# Base configuration. Env overlays (config.dev.yaml / staging / prod) merge on top.
+# Secrets are NEVER stored here - resolved from environment at load time.
+
+env: dev
+project_root: "."
+
+data:
+  raw_lake_root: "data/raw_lake"
+  symbols_path: "data/symbols.json"
+  nse:
+    provider: mock          # mock | truedata | eodhistorical | ... (real needs token)
+  universe:
+    default: ["RELIANCE", "INFY", "TCS", "HDFCBANK", "ITC"]
+
+storage:
+  db_dsn_env: QUANT_DB_DSN
+  redis_url_env: REDIS_URL
+  minio:
+    endpoint_env: MINIO_ENDPOINT
+    access_env: MINIO_ACCESS_KEY
+    secret_env: MINIO_SECRET_KEY
+  qdrant_url_env: QDRANT_URL
+
+experiment:
+  mlflow_uri_env: MLFLOW_TRACKING_URI
+  registry_stages: [None, Staging, Production]
+
+training:
+  horizons_days: [1, 5, 21, 63]
+  walk_forward:
+    train_months: 36
+    test_months: 3
+    step_months: 3
+  cv:
+    n_splits: 5
+    embargo_days: 5
+
+backtest:
+  cost:
+    stt_intraday_pct: 0.00025
+    stt_delivery_pct: 0.001
+    sebi_pct: 0.00002
+    stamp_pct: 0.00015
+    gst_pct: 0.18
+    dp_per_scrip: 15.0
+    brokerage_pct: 0.0002
+  slippage:
+    participation: 0.1
+    spread_bps: 5
+  risk:
+    max_position_pct: 0.05
+    max_drawdown_pct: 0.15
+    vol_circuit_breaker: 0.03

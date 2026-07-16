@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+
+# Environments / secrets
+.env
+.env.*
+!.env.example
+secrets.yaml
+configs/secrets.*.yaml
+
+# Data (never commit raw/market data)
+data/
+*.parquet
+*.duckdb
+*.db
+*.sqlite
+raw_lake/
+feature_store/.feast/
+
+# ML artifacts
+mlruns/
+wandb/
+experiments/runs/
+models/*.pkl
+models/*.joblib
+models/*.pt
+models/*.ckpt
+
+# Logs
+logs/
+*.log
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store/
+Thumbs.db
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Docker volumes
+postgres_data/
+redis_data/
+minio_data/
+qdrant_data/

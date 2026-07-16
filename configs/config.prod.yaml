@@ -1,0 +1,9 @@
+# Prod overlay (live, small capital)
+env: prod
+data:
+  nse:
+    provider: truedata         # requires NSE_TRUEDATA_TOKEN
+backtest:
+  risk:
+    max_position_pct: 0.02
+    max_drawdown_pct: 0.10

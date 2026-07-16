@@ -1,0 +1,5 @@
+# Dev overlay - merges on top of config.yaml (QUANT_ENV=dev)
+env: dev
+data:
+  nse:
+    provider: mock

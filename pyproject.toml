@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quant-platform"
+version = "0.1.0"
+description = "Institutional-grade NSE/BSE stock forecasting platform"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "numpy",
+    "pandas",
+    "polars",
+    "pyyaml",
+    "omegaconf",
+    "structlog",
+    "sqlalchemy>=2.0",
+    "alembic",
+    "psycopg[binary]",
+    "redis",
+    "qdrant-client",
+    "feast",
+    "pydantic>=2",
+    "fastapi",
+    "uvicorn",
+    "scikit-learn",
+    "xgboost",
+    "lightgbm",
+    "catboost",
+    "optuna",
+    "mlflow",
+    "pytorch",
+    "pytorch-lightning",
+    "transformers",
+    "sentence-transformers",
+    "prometheus-client",
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "black",
+    "mypy",
+    "pre-commit",
+    "ipython",
+]
+test = ["pytest", "pytest-cov"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "C4", "UP"]
+ignore = ["E501", "B008"]
+
+[tool.black]
+line-length = 100
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+disallow_untyped_defs = false
