@@ -85,6 +85,7 @@ Hybrid **batch + streaming + event-driven** system. Three planes:
 ## 2. Folder Structure
 
 ```
+# Artha  (codename; local folder: quant-platform/)
 quant-platform/
 ├── Makefile
 ├── pyproject.toml
