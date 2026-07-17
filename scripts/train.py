@@ -127,10 +127,27 @@ def main() -> int:
         return 1
 
     # ── Cross-sectional rank features ──────────────────────────────────────
+    # Columns that vary across symbols on the same day are ranked (the
+    # cross-sectional signal). Columns that are constant within a day -- e.g.
+    # market-regime macro (VIX, Nifty level, USDINR) -- carry NO cross-sectional
+    # rank info, so they are passed through RAW (their level/change is the
+    # signal). Auto-detect by within-day variance.
+    const_within_day = []
+    varying_within_day = []
+    for col in raw_feat_cols:
+        # variance of the column across symbols within each day; if always ~0
+        # the column is a macro/context feature.
+        day_var = df.groupby("event_ts")[col].transform("nunique")
+        if (day_var <= 1).all():
+            const_within_day.append(col)
+        else:
+            varying_within_day.append(col)
+
     if not args.no_rank:
-        df, rank_cols = add_cs_rank_features(df, raw_feat_cols)
-        feat_cols = rank_cols          # train on ranks; raw levels as context
-        print(f"  CS rank feats : {len(rank_cols)}  (rank_* prefix)")
+        df, rank_cols = add_cs_rank_features(df, varying_within_day)
+        feat_cols = rank_cols + const_within_day   # ranks + raw macro context
+        print(f"  CS rank feats : {len(rank_cols)} ranks + {len(const_within_day)} raw "
+              f"macro/context (constant-within-day)")
     else:
         feat_cols = raw_feat_cols
         print("  CS rank feats : disabled (--no-rank)")
