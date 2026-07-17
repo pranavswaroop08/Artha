@@ -93,11 +93,13 @@ def predict(req: PredictionRequest):
     # Real model when a bundle is wired; otherwise deterministic mock expected return.
     if _model is not None:
         model_version = "lgbm-conformal-0.1.0"
-        # Build a one-row feature frame keyed by the symbol's hash (mock features).
+        # Build a one-row feature frame matching the columns expected by the model.
         # In production this is replaced by the feature store lookup at as_of_ts.
-        feat_row = pd.DataFrame(
-            {"feat_x": [(h % 100) / 50.0 - 1.0], "feat_y": [((h * 7) % 100) / 50.0 - 1.0]}
-        )
+        mock_data = {}
+        for col in _model.feature_cols:
+            # Deterministic value in [0.0, 1.0] for the feature
+            mock_data[col] = [((h * len(col)) % 100) / 100.0]
+        feat_row = pd.DataFrame(mock_data)
         iv = _model.predict_interval(feat_row)[0]
         expected_return = round(float(iv.point), 3)
         ci_low, ci_high = round(float(iv.lower), 3), round(float(iv.upper), 3)

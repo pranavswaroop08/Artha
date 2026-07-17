@@ -89,3 +89,44 @@ def test_single_date_raises():
 def test_invalid_top_n_raises():
     with pytest.raises(ValueError, match="top_n"):
         VectorizedBacktester(top_n=0)
+
+
+def test_long_short_has_short_leg_and_neutral_gross():
+    """Long/short book includes a short leg and nets near zero on symmetric data."""
+    dates = pd.date_range("2026-01-01", periods=3)
+    rows = []
+    for d in dates:
+        for i in range(4):  # predictions 0..3 -> top-2 long, bottom-2 short
+            rows.append({"symbol": f"S{i}", "event_ts": d,
+                         "prediction": float(i), "close": 100.0})
+    df = pd.DataFrame(rows)
+    bt = VectorizedBacktester(top_n=2, long_short=True, hold_days=1)
+    res = bt.run(df, prediction_col="prediction", price_col="close")
+    # 2 long + 2 short per day * 2 tradable days (last date dropped) = 8.
+    assert res["summary"]["n_positions"] == 8
+    # All forward returns are 0 (constant close) -> neutral gross must be ~0.
+    assert abs(res["summary"]["gross_total_return"]) < 1e-9
+
+
+def test_long_short_reduces_beta_vs_long_only():
+    """Neutral gross return is materially smaller than long-only gross return."""
+    n = 10
+    rng = np.random.default_rng(0)
+    dates = pd.date_range("2026-01-01", periods=80)
+    rows = []
+    price = {f"S{i}": 100.0 for i in range(n)}
+    for d in dates:
+        mkt = rng.normal(0.001, 0.01)  # common market drift -> price moves
+        for i in range(n):
+            # Each name drifts with market + idiosyncratic; update price.
+            ret = mkt + rng.normal(0, 0.01)
+            price[f"S{i}"] *= (1 + ret)
+            rows.append({"symbol": f"S{i}", "event_ts": d,
+                         "prediction": rng.random(), "close": price[f"S{i}"]})
+    df = pd.DataFrame(rows)
+    lo = VectorizedBacktester(top_n=3, long_short=False, hold_days=5).run(
+        df, prediction_col="prediction", price_col="close")
+    ls = VectorizedBacktester(top_n=3, long_short=True, hold_days=5).run(
+        df, prediction_col="prediction", price_col="close")
+    # Long-only net return is mostly market beta -> larger gross than neutral.
+    assert lo["summary"]["gross_total_return"] > ls["summary"]["gross_total_return"] + 1e-9
