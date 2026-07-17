@@ -102,16 +102,24 @@ def main() -> int:
     ap.add_argument("--train-days", type=int, default=750)
     ap.add_argument("--test-days", type=int, default=125)
     ap.add_argument("--gap-days", type=int, default=5)
+    ap.add_argument("--target", type=str, default="target_fwd_ret_5d",
+                    help="Forward-return target column (default: 5d).")
     args = ap.parse_args()
 
     df = pd.read_parquet(args.features)
     raw = sorted(c for c in df.columns if c.startswith("feat_"))
     rank_cols = rank_features(df, raw)
-    target = "target_fwd_ret_5d"
+    target = args.target
+    # Default rebalance frequency to the forecast horizon (minimise turnover).
+    hold_days = args.hold_days if args.hold_days != 5 else None
+    if hold_days is None:
+        horizon = int(target.replace("target_fwd_ret_", "").replace("d", ""))
+        hold_days = max(1, horizon)
 
     print(f"\n{'='*64}\n  Artha -- HONEST EVALUATION (alpha vs beta vs random)\n{'='*64}")
     print(f"  {df['symbol'].nunique()} symbols | {len(df):,} rows | "
           f"{df['event_ts'].dt.date.nunique()} days")
+    print(f"  Target: {target}  (hold-days = {hold_days})")
 
     # Model OOS predictions
     model_df = oos_predictions(df, args.model, rank_cols, target, args.folds,
@@ -122,14 +130,14 @@ def main() -> int:
     rand_df["prediction"] = rng.random(len(rand_df))
 
     print("\n--- LONG-ONLY (bull-market flattering) ---")
-    run_backtest(model_df, args.top_n, args.hold_days, False, "model long-only")
+    run_backtest(model_df, args.top_n, hold_days, False, "model long-only")
 
     print("\n--- MARKET-NEUTRAL (long top-N / short bottom-N) ---")
-    s_mod, ds_mod, ma_mod = run_backtest(model_df, args.top_n, args.hold_days, True,
+    s_mod, ds_mod, ma_mod = run_backtest(model_df, args.top_n, hold_days, True,
                                           "model L/S")
 
     print("\n--- MARKET-NEUTRAL RANDOM (null check) ---")
-    s_rnd, ds_rnd, ma_rnd = run_backtest(rand_df, args.top_n, args.hold_days, True,
+    s_rnd, ds_rnd, ma_rnd = run_backtest(rand_df, args.top_n, hold_days, True,
                                           "random L/S")
 
     print("\n" + "=" * 64)
@@ -140,10 +148,9 @@ def main() -> int:
     elif ds_mod["p_value"] < 0.05:
         print("  [EDGE] deflated Sharpe significant (p<0.05) -- plausible skill.")
     else:
-        print("  [NO ALPHA] neutral model alpha ~ random. Profit in long-only")
-        print("  view is MARKET BETA, not model skill. IC is ~0; the features")
-        print("  (price-only momentum/vol/volume) carry no tradable 5d signal.")
-        print("  Next: add FII flows, options PCR, VIX, fundamentals, sentiment.")
+        print("  [NO ALPHA] neutral model alpha ~ random. Long-only profit is")
+        print("  MARKET BETA, not model skill. The features carry no tradable")
+        print(f"  {target} signal yet. Next: FII flows, options PCR, sentiment.")
     print()
     return 0
 
