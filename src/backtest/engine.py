@@ -102,6 +102,8 @@ class VectorizedBacktester:
             if date in rebalance_set:
                 current_pred = df.loc[day_mask, prediction_col].copy()
                 current_pred.index = df.loc[day_mask, "symbol"].values
+                # Defensive: drop duplicate symbol labels before reindex.
+                current_pred = current_pred[~current_pred.index.duplicated(keep="last")]
             if current_pred is not None:
                 # Assign rank from latest rebalance snapshot to today's rows
                 day_syms = df.loc[day_mask, "symbol"]

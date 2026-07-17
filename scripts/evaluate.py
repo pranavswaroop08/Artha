@@ -124,6 +124,9 @@ def main() -> int:
     # Model OOS predictions
     model_df = oos_predictions(df, args.model, rank_cols, target, args.folds,
                                 args.train_days, args.test_days, args.gap_days)
+    # De-duplicate (symbol, event_ts) rows — expanding walk-forward can emit
+    # overlapping rows, and raw data can contain dup bars. Keep last.
+    model_df = model_df.drop_duplicates(subset=["symbol", "event_ts"], keep="last")
     # Random null
     rng = np.random.default_rng(7)
     rand_df = model_df.copy()

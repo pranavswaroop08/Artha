@@ -130,3 +130,22 @@ def test_long_short_reduces_beta_vs_long_only():
         df, prediction_col="prediction", price_col="close")
     # Long-only net return is mostly market beta -> larger gross than neutral.
     assert lo["summary"]["gross_total_return"] > ls["summary"]["gross_total_return"] + 1e-9
+
+
+def test_duplicate_symbol_rows_do_not_crash():
+    """Regression: duplicate (event_ts, symbol) rows must not crash reindex."""
+    dates = pd.date_range("2026-01-01", periods=6)
+    rows = []
+    for d in dates:
+        for i in range(4):
+            rows.append({"symbol": f"S{i}", "event_ts": d,
+                         "prediction": float(i), "close": 100.0 + i})
+    # Inject a duplicate (event_ts, symbol) row.
+    rows.append({"symbol": "S0", "event_ts": dates[0],
+                 "prediction": 0.0, "close": 100.0})
+    df = pd.DataFrame(rows)
+    bt = VectorizedBacktester(top_n=2, long_short=True, hold_days=1)
+    res = bt.run(df, prediction_col="prediction", price_col="close")
+    # Runs without raising; net_sharpe is finite.
+    assert res["summary"]["n_positions"] > 0
+    assert res["summary"]["net_sharpe"] == res["summary"]["net_sharpe"]  # not NaN
