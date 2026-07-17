@@ -33,6 +33,7 @@ dependencies = [
     "mlflow",
     "pytorch",
     "pytorch-lightning",
+    "openai",
     "transformers",
     "sentence-transformers",
     "prometheus-client",
