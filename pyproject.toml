@@ -25,6 +25,7 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "scikit-learn",
+    "scipy",
     "xgboost",
     "lightgbm",
     "catboost",
