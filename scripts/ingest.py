@@ -83,6 +83,11 @@ def parse_args() -> argparse.Namespace:
         help="Yahoo ticker suffix. .NS = NSE (default), .BO = BSE.",
     )
     p.add_argument(
+        "--out-dir", type=str, default=None,
+        help="Output directory for parquet artifacts (default: data/). "
+             "Use a separate dir (e.g. data/n50) to avoid clobbering existing data.",
+    )
+    p.add_argument(
         "--horizons", nargs="+", type=int, default=[1, 5, 21],
         metavar="N",
         help="Forward-return horizons in trading days (default: 1 5 21).",
@@ -174,8 +179,14 @@ def save_parquet(df: pd.DataFrame, path: Path, name: str) -> None:
 
 
 def main() -> int:
+    global OFFLINE_DIR, RAW_LAKE_DIR
     args = parse_args()
     start, end = _resolve_dates(args.start, args.end)
+
+    if args.out_dir:
+        out = Path(args.out_dir)
+        OFFLINE_DIR = out / "offline"
+        RAW_LAKE_DIR = out / "raw_lake"
 
     print("\n" + "=" * 56)
     print("  Artha -- Data Ingestion")
