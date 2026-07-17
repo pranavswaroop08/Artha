@@ -6,16 +6,30 @@ MLflow-registry-loaded model when persistence lands.
 """
 from __future__ import annotations
 
-from fastapi import FastAPI
+import time
+
+from fastapi import FastAPI, Request
+from fastapi.responses import PlainTextResponse
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from .models import ContributingFactor, PredictionRequest, PredictionResponse
 from ..nlp.llm_client import MockLLMClient
+from ..monitoring import metrics
 from ..common.context import get_logger
 
 logger = get_logger(__name__)
 
 app = FastAPI(title="Artha Quant Platform API", version="0.1.0")
 llm_client = MockLLMClient()
+
+
+@app.middleware("http")
+async def track_latency(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    if request.url.path == "/predict" and request.method == "POST":
+        metrics.PREDICT_LATENCY.observe(time.perf_counter() - start)
+    return response
 
 
 def _deterministic_probs(symbol: str) -> tuple[float, float, float]:
@@ -46,6 +60,11 @@ def predict(req: PredictionRequest):
     h = sum(ord(c) for c in req.symbol) % 100
     prob_up, prob_down, prob_flat = _deterministic_probs(req.symbol)
     expected_return = round(0.01 + (h / 100) * 0.05, 3)
+    confidence = 0.71
+    action = "LONG_PARTIAL" if prob_up > 0.5 else "HOLD"
+
+    metrics.PREDICT_REQUESTS.labels(recommended_action=action).inc()
+    metrics.PREDICTION_CONFIDENCE.observe(confidence)
 
     factors = [
         ContributingFactor(feature="fii_net_buy_5d", impact=0.12, direction="up"),
@@ -72,14 +91,22 @@ def predict(req: PredictionRequest):
         expected_return=expected_return,
         return_ci_low=round(expected_return - 0.024, 3),
         return_ci_high=round(expected_return + 0.031, 3),
-        confidence=0.71,
+        confidence=confidence,
         risk_score=0.42,
         suggested_stop_loss_pct=-0.045,
         suggested_take_profit_pct=0.062,
-        recommended_action="LONG_PARTIAL" if prob_up > 0.5 else "HOLD",
+        recommended_action=action,
         position_size_pct=1.8,
         top_contributing_factors=factors,
         explanation=explanation,
         model_version="mock-0.1.0",
         regime="risk_on_trending",
+    )
+
+
+@app.get("/metrics", response_class=PlainTextResponse)
+def get_metrics():
+    """Prometheus scrape endpoint."""
+    return PlainTextResponse(
+        generate_latest(metrics.REGISTRY), media_type=CONTENT_TYPE_LATEST
     )
