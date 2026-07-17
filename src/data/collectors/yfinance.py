@@ -75,6 +75,13 @@ class YFinanceCollector:
 
     def collect_range(self, symbol: str,
                       start: dt.date, end: dt.date) -> Iterator[EODBar]:
+        # Prefer the client's bulk fetch_range (one HTTP call, naturally skips
+        # market holidays) when the client implements it.
+        bulk = getattr(self.client, "fetch_range", None)
+        if bulk is not None:
+            yield from bulk(symbol, start, end)
+            return
+        # Mock / single-day clients: iterate weekday-by-weekday.
         d = start
         one = dt.timedelta(days=1)
         while d <= end:
@@ -88,10 +95,7 @@ def _build_client(cfg, provider: str | None = None) -> YFinanceClient:
     if provider == "mock":
         return MockYFinanceClient()
     if provider == "yfinance":
-        # Real client would wrap the `yfinance` package (lazy import).
-        raise NotImplementedError(
-            "Real yfinance client not implemented - add a subclass of "
-            "YFinanceClient that wraps the `yfinance` package and wire it here."
-        )
-    # Only 'mock' and 'yfinance' are recognized today.
-    raise ValueError(f"Unknown YFinance provider: {provider}")
+        from .yfinance_real import RealYFinanceClient
+        suffix = cfg.get("data", {}).get("yfinance", {}).get("suffix", ".NS")
+        return RealYFinanceClient(suffix=suffix)
+    raise ValueError(f"Unknown YFinance provider: {provider!r}. Valid: 'mock', 'yfinance'.")

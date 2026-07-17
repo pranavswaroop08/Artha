@@ -138,15 +138,15 @@ class RealYFinanceClient(YFinanceClient):
 
         for ts, row in df.iterrows():
             bar_date = ts.date() if hasattr(ts, "date") else ts
-            volume = int(row.get("Volume", 0).iloc[0])
+            volume = int(row.get("Volume", 0))
             try:
                 bar = EODBar(
                     symbol=symbol.upper(),
                     date=bar_date,
-                    open=float(row["Open"].iloc[0]),
-                    high=float(row["High"].iloc[0]),
-                    low=float(row["Low"].iloc[0]),
-                    close=float(row["Close"].iloc[0]),
+                    open=float(row["Open"]),
+                    high=float(row["High"]),
+                    low=float(row["Low"]),
+                    close=float(row["Close"]),
                     volume=volume,
                     delivery_pct=None,
                 )
