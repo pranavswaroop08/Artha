@@ -35,6 +35,7 @@ dependencies = [
     "pytorch-lightning",
     "openai",
     "transformers",
+    "yfinance",
     "sentence-transformers",
     "prometheus-client",
     "opentelemetry-api",
