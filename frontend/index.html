@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARTHA — Equity Signal Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#080b14;
+    --surface:#0f1623;
+    --surface-glass: rgba(15,22,35,0.9);
+    --border: rgba(255,255,255,0.07);
+    --border-hover: rgba(255,255,255,0.16);
+    --indigo:#6366f1;
+    --indigo-soft: rgba(99,102,241,0.14);
+    --emerald:#10b981;
+    --emerald-soft: rgba(16,185,129,0.14);
+    --amber:#f59e0b;
+    --amber-soft: rgba(245,158,11,0.14);
+    --rose:#f43f5e;
+    --rose-soft: rgba(244,63,94,0.14);
+    --text:#f1f5f9;
+    --muted:#64748b;
+  }
+
+  *{ box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, rgba(99,102,241,0.10), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter', -apple-system, sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+
+  .mono{ font-family:'JetBrains Mono', monospace; }
+
+  ::selection{ background: var(--indigo-soft); color:var(--text); }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:0.001ms !important; transition-duration:0.001ms !important; }
+  }
+
+  /* ---------- layout shells ---------- */
+  .page{ max-width:1200px; margin:0 auto; padding:0 32px 96px; }
+
+  /* ---------- HERO ---------- */
+  .hero{
+    position:relative;
+    padding:96px 32px 72px;
+    text-align:center;
+    overflow:hidden;
+  }
+  .hero::before{
+    content:"";
+    position:absolute; inset:0;
+    background-image:
+      radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px);
+    background-size:26px 26px;
+    -webkit-mask-image: radial-gradient(ellipse 700px 340px at 50% 30%, black 40%, transparent 78%);
+            mask-image: radial-gradient(ellipse 700px 340px at 50% 30%, black 40%, transparent 78%);
+    pointer-events:none;
+  }
+  .hero-inner{ position:relative; z-index:1; }
+
+  .brand{
+    display:inline-flex; align-items:center; gap:10px;
+    font-size:56px; font-weight:700; letter-spacing:-1.5px;
+    margin:0;
+  }
+  .brand .dot{
+    width:11px; height:11px; border-radius:50%;
+    background: var(--emerald);
+    box-shadow: 0 0 18px 3px rgba(16,185,129,0.55);
+    animation: pulse-dot 2.4s ease-in-out infinite;
+    transform: translateY(-20px);
+  }
+  @keyframes pulse-dot{
+    0%,100%{ opacity:1; box-shadow:0 0 18px 3px rgba(16,185,129,0.55); }
+    50%{ opacity:0.55; box-shadow:0 0 8px 1px rgba(16,185,129,0.3); }
+  }
+  .subtitle{
+    margin:10px 0 0;
+    color:var(--muted);
+    font-size:15px;
+    letter-spacing:3.5px;
+    text-transform:uppercase;
+    font-weight:500;
+  }
+
+  .search-row{
+    margin:44px auto 0;
+    max-width:560px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background: var(--surface-glass);
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:6px;
+    height:56px;
+    transition: border-color .2s ease, box-shadow .2s ease;
+  }
+  .search-row:focus-within{
+    border-color: rgba(99,102,241,0.55);
+    box-shadow: 0 0 0 4px var(--indigo-soft), 0 0 30px rgba(99,102,241,0.15);
+  }
+  .search-row input{
+    flex:1;
+    background:transparent;
+    border:none;
+    outline:none;
+    color:var(--text);
+    font-family:'JetBrains Mono', monospace;
+    font-size:16px;
+    font-weight:600;
+    letter-spacing:1px;
+    padding:0 10px 0 18px;
+    text-transform:uppercase;
+  }
+  .search-row input::placeholder{
+    color:var(--muted);
+    font-weight:400;
+    text-transform:none;
+    letter-spacing:normal;
+  }
+
+  .btn-signal{
+    position:relative;
+    overflow:hidden;
+    border:none;
+    height:44px;
+    padding:0 24px;
+    border-radius:999px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color:#fff;
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:14.5px;
+    letter-spacing:0.2px;
+    cursor:pointer;
+    box-shadow: 0 4px 20px rgba(99,102,241,0.35);
+    transition: transform .2s ease, box-shadow .2s ease;
+    white-space:nowrap;
+  }
+  .btn-signal:hover{ transform: translateY(-1px); box-shadow: 0 6px 26px rgba(99,102,241,0.5); }
+  .btn-signal:active{ transform: translateY(0); }
+  .btn-signal::after{
+    content:"";
+    position:absolute; top:0; left:-60%;
+    width:40%; height:100%;
+    background: linear-gradient(120deg, transparent, rgba(255,255,255,0.35), transparent);
+    transform: skewX(-20deg);
+    transition: left .55s ease;
+  }
+  .btn-signal:hover::after{ left:130%; }
+  .btn-signal:disabled{ opacity:0.6; cursor:default; }
+  .btn-signal:disabled::after{ display:none; }
+
+  .hint{
+    margin-top:14px;
+    color:var(--muted);
+    font-size:12.5px;
+    letter-spacing:0.3px;
+  }
+  .hint .mono{ color:#8b93a7; }
+
+  /* ---------- ALERT ---------- */
+  .alert{
+    max-width:560px;
+    margin:20px auto 0;
+    background: var(--rose-soft);
+    border:1px solid rgba(244,63,94,0.35);
+    color:#ffd7de;
+    padding:14px 18px;
+    border-radius:12px;
+    font-size:13.5px;
+    text-align:left;
+    display:none;
+    align-items:flex-start;
+    gap:10px;
+    line-height:1.5;
+  }
+  .alert.show{ display:flex; }
+  .alert code{
+    font-family:'JetBrains Mono', monospace;
+    background: rgba(0,0,0,0.25);
+    padding:1px 6px;
+    border-radius:5px;
+    font-size:12.5px;
+  }
+
+  /* ---------- SHIMMER ---------- */
+  .shimmer{
+    position:relative;
+    overflow:hidden;
+    background: rgba(255,255,255,0.04);
+    border-radius:8px;
+  }
+  .shimmer::after{
+    content:"";
+    position:absolute; inset:0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+    animation: shimmer-sweep 1.6s infinite;
+  }
+  @keyframes shimmer-sweep{ 100%{ transform: translateX(100%); } }
+
+  .result-skeleton{ max-width:720px; margin:36px auto 0; }
+  .sk-row{ height:18px; margin-bottom:12px; border-radius:6px; }
+
+  /* ---------- RESULT CARD ---------- */
+  .result-wrap{ max-width:720px; margin:36px auto 0; text-align:left; }
+
+  .card{
+    background: var(--surface-glass);
+    border:1px solid var(--border);
+    border-radius:16px;
+    box-shadow: 0 0 0 1px rgba(99,102,241,0.02), 0 20px 50px -20px rgba(0,0,0,0.6);
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+  }
+  .card:hover{
+    transform: translateY(-2px);
+    border-color: var(--border-hover);
+    box-shadow: 0 24px 60px -18px rgba(0,0,0,0.65), 0 0 0 1px rgba(99,102,241,0.08);
+  }
+
+  .result-card{ padding:26px 28px 28px; }
+
+  .result-top{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:22px;
+  }
+  .result-symbol{ font-size:26px; font-weight:600; letter-spacing:0.5px; }
+
+  .badge{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:12px; font-weight:600; letter-spacing:0.6px;
+    padding:6px 13px; border-radius:999px; text-transform:uppercase;
+    border:1px solid transparent;
+  }
+  .badge.emerald{ background:var(--emerald-soft); color:var(--emerald); border-color:rgba(16,185,129,0.3); }
+  .badge.amber{ background:var(--amber-soft); color:var(--amber); border-color:rgba(245,158,11,0.3); }
+  .badge.rose{ background:var(--rose-soft); color:var(--rose); border-color:rgba(244,63,94,0.3); }
+
+  .metrics-row{
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap:12px;
+    margin-bottom:24px;
+  }
+  .metric-box{
+    background: rgba(255,255,255,0.02);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:14px 14px 13px;
+  }
+  .metric-label{
+    font-size:10.5px; text-transform:uppercase; letter-spacing:0.8px;
+    color:var(--muted); font-weight:600; margin-bottom:8px;
+  }
+  .metric-value{ font-size:19px; font-weight:700; }
+  .metric-value.mono{ font-size:15px; font-weight:600; }
+  .metric-value.emerald{ color:var(--emerald); }
+  .metric-value.rose{ color:var(--rose); }
+
+  .gauge-row{ display:flex; align-items:center; gap:8px; }
+  .gauge-row svg{ flex-shrink:0; }
+
+  .risk-row{ display:flex; align-items:center; gap:8px; }
+  .risk-dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+
+  .prob-section{ margin-bottom:22px; }
+  .prob-bar-row{ display:flex; align-items:center; gap:12px; margin-bottom:9px; }
+  .prob-label{
+    width:78px; flex-shrink:0;
+    font-size:12px; font-weight:600; letter-spacing:0.3px;
+    display:flex; align-items:center; gap:5px;
+  }
+  .prob-track{
+    flex:1; height:8px; border-radius:999px;
+    background: rgba(255,255,255,0.05);
+    overflow:hidden;
+  }
+  .prob-fill{
+    height:100%; border-radius:999px; width:0%;
+    transition: width 1s cubic-bezier(.16,1,.3,1);
+  }
+  .prob-fill.up{ background: linear-gradient(90deg, #10b981, #34d399); }
+  .prob-fill.flat{ background: #64748b; }
+  .prob-fill.down{ background: linear-gradient(90deg, #f43f5e, #fb7185); }
+  .prob-pct{ width:38px; text-align:right; font-size:12.5px; flex-shrink:0; }
+
+  .explain-box{
+    background: rgba(99,102,241,0.06);
+    border-left:3px solid var(--indigo);
+    border-radius:8px;
+    padding:14px 16px;
+    font-size:13.5px;
+    line-height:1.6;
+    color:#dfe3ee;
+  }
+  .factors{ margin-top:12px; display:flex; flex-direction:column; gap:8px; }
+  .factor-row{ display:flex; align-items:center; gap:10px; font-size:12.5px; }
+  .factor-name{ width:130px; flex-shrink:0; color:var(--muted); font-family:'JetBrains Mono', monospace; font-size:11.5px; }
+  .factor-track{ flex:1; height:5px; border-radius:999px; background:rgba(255,255,255,0.05); overflow:hidden; }
+  .factor-fill{ height:100%; border-radius:999px; }
+  .factor-arrow{ width:14px; text-align:center; font-size:12px; }
+
+  /* ---------- WATCHLIST ---------- */
+  .watchlist-section{ margin-top:88px; }
+  .watchlist-head{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:22px;
+  }
+  .watchlist-head h2{ font-size:20px; font-weight:600; margin:0; letter-spacing:-0.2px; }
+
+  .btn-add{
+    display:flex; align-items:center; gap:6px;
+    background: rgba(255,255,255,0.04);
+    border:1px solid var(--border);
+    color:var(--text);
+    font-size:13px; font-weight:600;
+    padding:9px 16px; border-radius:999px;
+    cursor:pointer; transition: all .2s ease;
+  }
+  .btn-add:hover{ background: var(--indigo-soft); border-color:rgba(99,102,241,0.4); color:#c7c9ff; }
+
+  .add-form{
+    display:none;
+    align-items:center; gap:8px;
+    background: rgba(255,255,255,0.04);
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:5px 5px 5px 16px;
+  }
+  .add-form.show{ display:flex; }
+  .add-form input{
+    background:transparent; border:none; outline:none;
+    color:var(--text); font-family:'JetBrains Mono', monospace;
+    font-size:13px; font-weight:600; text-transform:uppercase;
+    width:120px;
+  }
+  .add-form input::placeholder{ color:var(--muted); text-transform:none; font-weight:400; }
+  .add-form button{
+    background: var(--indigo); border:none; color:#fff;
+    width:28px; height:28px; border-radius:50%;
+    font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition: background .2s ease;
+  }
+  .add-form button:hover{ background:#7476f4; }
+
+  .watchlist-grid{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap:16px;
+  }
+  @media (max-width: 980px){
+    .watchlist-grid{ grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 620px){
+    .watchlist-grid{ grid-template-columns: 1fr; }
+    .metrics-row{ grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .wl-card{
+    padding:18px 18px 16px;
+    position:relative;
+  }
+  .wl-top{ display:flex; align-items:flex-start; justify-content:space-between; }
+  .wl-ticker{ font-size:18px; font-weight:600; letter-spacing:0.3px; }
+  .wl-actions{ display:flex; align-items:center; gap:6px; }
+
+  .icon-btn{
+    width:26px; height:26px; border-radius:7px;
+    background: rgba(255,255,255,0.03);
+    border:1px solid var(--border);
+    color:var(--muted);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; transition: all .2s ease;
+    font-size:13px;
+  }
+  .icon-btn:hover{ color:var(--text); border-color:var(--border-hover); background:rgba(255,255,255,0.06); }
+  .icon-btn.spinning svg{ animation: spin 0.8s linear infinite; }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  .wl-return{ font-size:26px; font-weight:700; margin:14px 0 2px; }
+  .wl-badge-row{ display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+  .wl-ci{ color:var(--muted); font-size:11.5px; }
+
+  .wl-spark{ margin:10px 0 4px; }
+
+  .wl-skel{ height:120px; }
+
+  /* focus visibility */
+  a:focus-visible, button:focus-visible, input:focus-visible{
+    outline: 2px solid var(--indigo);
+    outline-offset: 2px;
+  }
+
+  .footer-note{
+    text-align:center; color:var(--muted); font-size:12px; margin-top:60px;
+    letter-spacing:0.2px;
+  }
+</style>
+</head>
+<body>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <h1 class="brand">ARTHA<span class="dot"></span></h1>
+      <p class="subtitle">Equity Signal Engine</p>
+
+      <div class="search-row">
+        <input id="symbolInput" type="text" placeholder="RELIANCE, TCS, INFY…" maxlength="20" autocomplete="off" spellcheck="false">
+        <button class="btn-signal" id="getSignalBtn">Get Signal</button>
+      </div>
+      <div class="hint">Model queries <span class="mono">127.0.0.1:8005/predict</span> · 5-day horizon</div>
+
+      <div class="alert" id="errorAlert">
+        <span>⚠</span>
+        <span>Cannot connect to Artha API — run: <code>uvicorn src.serve.app:app --port 8005</code></span>
+      </div>
+
+      <div class="result-skeleton" id="resultSkeleton" style="display:none;">
+        <div class="card" style="padding:26px 28px;">
+          <div class="shimmer sk-row" style="width:40%; height:26px;"></div>
+          <div class="shimmer sk-row" style="width:100%; height:70px; margin-top:18px;"></div>
+          <div class="shimmer sk-row" style="width:100%; height:60px;"></div>
+          <div class="shimmer sk-row" style="width:80%; height:50px;"></div>
+        </div>
+      </div>
+
+      <div class="result-wrap" id="resultWrap"></div>
+    </div>
+  </section>
+
+  <div class="page">
+    <section class="watchlist-section">
+      <div class="watchlist-head">
+        <h2>My Watchlist</h2>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="add-form" id="addForm">
+            <input id="addInput" type="text" placeholder="TICKER" maxlength="20" autocomplete="off" spellcheck="false">
+            <button id="addConfirm" aria-label="Add to watchlist">+</button>
+          </div>
+          <button class="btn-add" id="addToggle">+ Add</button>
+        </div>
+      </div>
+
+      <div class="watchlist-grid" id="watchlistGrid"></div>
+    </section>
+
+    <div class="footer-note">Signals are model-generated estimates, not investment advice.</div>
+  </div>
+
+<script>
+(function(){
+  const API_URL = "http://127.0.0.1:8005/predict";
+  const DEFAULT_WATCHLIST = ["RELIANCE","TCS","INFY","HDFCBANK","ITC"];
+
+  // ---------- helpers ----------
+  function actionTone(action){
+    const a = (action || "").toUpperCase();
+    if (a.includes("LONG")) return "emerald";
+    if (a.includes("HOLD")) return "amber";
+    if (a.includes("SHORT")) return "rose";
+    return "amber";
+  }
+
+  function fmtPct(x, digits){
+    digits = digits === undefined ? 1 : digits;
+    const v = (x * 100);
+    const sign = v > 0 ? "+" : "";
+    return sign + v.toFixed(digits) + "%";
+  }
+
+  function fmtPct0(x){
+    return Math.round(x * 100) + "%";
+  }
+
+  function riskColor(r){
+    if (r < 0.34) return "#10b981";
+    if (r < 0.67) return "#f59e0b";
+    return "#f43f5e";
+  }
+
+  function todayISO(){
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const day = String(d.getDate()).padStart(2,"0");
+    return `${y}-${m}-${day}T15:30:00+05:30`;
+  }
+
+  // seeded PRNG from string, for deterministic sparklines
+  function seededRandom(str){
+    let h = 1779033703 ^ str.length;
+    for (let i = 0; i < str.length; i++){
+      h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+      h = (h << 13) | (h >>> 19);
+    }
+    return function(){
+      h = Math.imul(h ^ (h >>> 16), 2246822519);
+      h = Math.imul(h ^ (h >>> 13), 3266489917);
+      h ^= h >>> 16;
+      return (h >>> 0) / 4294967296;
+    };
+  }
+
+  function generateSparklinePoints(ticker){
+    const rand = seededRandom(ticker);
+    let val = 50;
+    const pts = [val];
+    for (let i = 1; i < 7; i++){
+      val += (rand() - 0.48) * 22;
+      val = Math.max(8, Math.min(92, val));
+      pts.push(val);
+    }
+    return pts;
+  }
+
+  function smoothPath(points, w, h){
+    const n = points.length;
+    const stepX = w / (n - 1);
+    const coords = points.map((p, i) => [i * stepX, h - (p / 100) * h]);
+    let d = `M ${coords[0][0]},${coords[0][1]}`;
+    for (let i = 0; i < coords.length - 1; i++){
+      const [x0,y0] = coords[i === 0 ? 0 : i - 1];
+      const [x1,y1] = coords[i];
+      const [x2,y2] = coords[i + 1];
+      const [x3,y3] = coords[i + 2 < coords.length ? i + 2 : coords.length - 1];
+      const cp1x = x1 + (x2 - x0) / 6;
+      const cp1y = y1 + (y2 - y0) / 6;
+      const cp2x = x2 - (x3 - x1) / 6;
+      const cp2y = y2 - (y3 - y1) / 6;
+      d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${x2},${y2}`;
+    }
+    return d;
+  }
+
+  function sparklineSVG(ticker){
+    const pts = generateSparklinePoints(ticker);
+    const up = pts[pts.length - 1] >= pts[0];
+    const color = up ? "#10b981" : "#f43f5e";
+    const w = 220, h = 44;
+    const path = smoothPath(pts, w, h);
+    const lastX = w, lastY = h - (pts[pts.length-1]/100)*h;
+    return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none" style="overflow:visible;">
+      <path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${lastX-1.5}" cy="${lastY}" r="2.6" fill="${color}"/>
+    </svg>`;
+  }
+
+  function confidenceGauge(conf){
+    const r = 15, c = 2 * Math.PI * r;
+    const offset = c * (1 - conf);
+    return `<svg width="34" height="34" viewBox="0 0 34 34">
+      <circle cx="17" cy="17" r="${r}" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="4"/>
+      <circle cx="17" cy="17" r="${r}" fill="none" stroke="#6366f1" stroke-width="4"
+        stroke-dasharray="${c}" stroke-dashoffset="${offset}" stroke-linecap="round"
+        transform="rotate(-90 17 17)"/>
+    </svg>`;
+  }
+
+  // ---------- API ----------
+  async function fetchPredict(symbol){
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol: symbol, as_of_ts: todayISO() })
+    });
+    if (!res.ok) throw new Error("Bad response " + res.status);
+    return res.json();
+  }
+
+  // ---------- HERO SECTION ----------
+  const symbolInput = document.getElementById("symbolInput");
+  const getSignalBtn = document.getElementById("getSignalBtn");
+  const errorAlert = document.getElementById("errorAlert");
+  const resultSkeleton = document.getElementById("resultSkeleton");
+  const resultWrap = document.getElementById("resultWrap");
+
+  function renderResultCard(data){
+    const tone = actionTone(data.recommended_action);
+    const retPositive = data.expected_return >= 0;
+    const factorsHTML = (data.top_contributing_factors || []).map(f => {
+      const arrow = f.direction === "up" ? "↑" : "↓";
+      const color = f.direction === "up" ? "var(--emerald)" : "var(--rose)";
+      const width = Math.min(100, Math.abs(f.impact) * 400);
+      return `<div class="factor-row">
+        <div class="factor-name">${f.feature}</div>
+        <div class="factor-track"><div class="factor-fill" style="width:${width}%; background:${color};"></div></div>
+        <div class="factor-arrow" style="color:${color};">${arrow}</div>
+      </div>`;
+    }).join("");
+
+    resultWrap.innerHTML = `
+      <div class="card result-card">
+        <div class="result-top">
+          <div class="result-symbol mono">${data.symbol}</div>
+          <div class="badge ${tone}">${(data.recommended_action || "").replace(/_/g," ")}</div>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <div class="metric-label">Expected Return</div>
+            <div class="metric-value mono ${retPositive ? "emerald" : "rose"}">${fmtPct(data.expected_return)}</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">90% CI</div>
+            <div class="metric-value mono" style="font-size:13.5px;">${fmtPct(data.return_ci_low)} → ${fmtPct(data.return_ci_high)}</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Confidence</div>
+            <div class="gauge-row">
+              ${confidenceGauge(data.confidence)}
+              <span class="metric-value mono" style="font-size:15px;">${fmtPct0(data.confidence)}</span>
+            </div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Risk Score</div>
+            <div class="risk-row">
+              <span class="risk-dot" style="background:${riskColor(data.risk_score)};"></span>
+              <span class="metric-value mono" style="font-size:15px;">${data.risk_score.toFixed(2)} / 1.0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="prob-section">
+          <div class="prob-bar-row">
+            <div class="prob-label" style="color:var(--emerald);">▲ UP</div>
+            <div class="prob-track"><div class="prob-fill up" data-target="${data.prob_up*100}"></div></div>
+            <div class="prob-pct mono">${fmtPct0(data.prob_up)}</div>
+          </div>
+          <div class="prob-bar-row">
+            <div class="prob-label" style="color:var(--muted);">— FLAT</div>
+            <div class="prob-track"><div class="prob-fill flat" data-target="${data.prob_flat*100}"></div></div>
+            <div class="prob-pct mono">${fmtPct0(data.prob_flat)}</div>
+          </div>
+          <div class="prob-bar-row">
+            <div class="prob-label" style="color:var(--rose);">▼ DOWN</div>
+            <div class="prob-track"><div class="prob-fill down" data-target="${data.prob_down*100}"></div></div>
+            <div class="prob-pct mono">${fmtPct0(data.prob_down)}</div>
+          </div>
+        </div>
+
+        <div class="explain-box">
+          ${data.explanation}
+          <div class="factors">${factorsHTML}</div>
+        </div>
+      </div>
+    `;
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        resultWrap.querySelectorAll(".prob-fill").forEach(el => {
+          el.style.width = el.dataset.target + "%";
+        });
+      });
+    });
+  }
+
+  async function handleGetSignal(){
+    const symbol = symbolInput.value.trim().toUpperCase();
+    if (!symbol) { symbolInput.focus(); return; }
+
+    errorAlert.classList.remove("show");
+    resultWrap.innerHTML = "";
+    resultSkeleton.style.display = "block";
+    getSignalBtn.disabled = true;
+
+    try{
+      const data = await fetchPredict(symbol);
+      resultSkeleton.style.display = "none";
+      renderResultCard(data);
+    } catch(err){
+      resultSkeleton.style.display = "none";
+      errorAlert.classList.add("show");
+    } finally {
+      getSignalBtn.disabled = false;
+    }
+  }
+
+  getSignalBtn.addEventListener("click", handleGetSignal);
+  symbolInput.addEventListener("keydown", e => { if (e.key === "Enter") handleGetSignal(); });
+
+  // ---------- WATCHLIST ----------
+  const watchlistGrid = document.getElementById("watchlistGrid");
+  const addToggle = document.getElementById("addToggle");
+  const addForm = document.getElementById("addForm");
+  const addInput = document.getElementById("addInput");
+  const addConfirm = document.getElementById("addConfirm");
+
+  function loadWatchlist(){
+    try{
+      const raw = localStorage.getItem("artha_watchlist");
+      if (!raw) return DEFAULT_WATCHLIST.slice();
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) && parsed.length ? parsed : DEFAULT_WATCHLIST.slice();
+    } catch(e){
+      return DEFAULT_WATCHLIST.slice();
+    }
+  }
+
+  function saveWatchlist(list){
+    localStorage.setItem("artha_watchlist", JSON.stringify(list));
+  }
+
+  let watchlist = loadWatchlist();
+
+  function wlCardSkeleton(ticker){
+    return `<div class="card wl-card" data-ticker="${ticker}">
+      <div class="wl-top">
+        <div class="wl-ticker mono">${ticker}</div>
+        <div class="wl-actions">
+          <button class="icon-btn wl-refresh" aria-label="Refresh ${ticker}">⟳</button>
+          <button class="icon-btn wl-remove" aria-label="Remove ${ticker}">×</button>
+        </div>
+      </div>
+      <div class="shimmer wl-skel" style="margin-top:14px;"></div>
+    </div>`;
+  }
+
+  function wlCardContent(ticker, data){
+    const tone = actionTone(data.recommended_action);
+    const retPositive = data.expected_return >= 0;
+    return `
+      <div class="wl-top">
+        <div class="wl-ticker mono">${ticker}</div>
+        <div class="wl-actions">
+          <button class="icon-btn wl-refresh" aria-label="Refresh ${ticker}">⟳</button>
+          <button class="icon-btn wl-remove" aria-label="Remove ${ticker}">×</button>
+        </div>
+      </div>
+      <div class="wl-return mono ${retPositive ? "emerald" : "rose"}" style="color:${retPositive ? "var(--emerald)" : "var(--rose)"};">${fmtPct(data.expected_return)}</div>
+      <div class="wl-badge-row">
+        <div class="badge ${tone}" style="font-size:10.5px; padding:4px 10px;">${(data.recommended_action||"").replace(/_/g," ")}</div>
+      </div>
+      <div class="wl-ci mono">${fmtPct(data.return_ci_low)} → ${fmtPct(data.return_ci_high)}</div>
+      <div class="wl-spark">${sparklineSVG(ticker)}</div>
+    `;
+  }
+
+  function wlCardError(ticker){
+    return `
+      <div class="wl-top">
+        <div class="wl-ticker mono">${ticker}</div>
+        <div class="wl-actions">
+          <button class="icon-btn wl-refresh" aria-label="Refresh ${ticker}">⟳</button>
+          <button class="icon-btn wl-remove" aria-label="Remove ${ticker}">×</button>
+        </div>
+      </div>
+      <div style="margin-top:18px; color:var(--rose); font-size:12.5px; line-height:1.5;">
+        API unreachable. <span style="color:var(--muted);">Click ⟳ to retry.</span>
+      </div>
+    `;
+  }
+
+  function renderWatchlistGrid(){
+    watchlistGrid.innerHTML = watchlist.map(t => wlCardSkeleton(t)).join("");
+    watchlist.forEach(ticker => loadWlCard(ticker));
+  }
+
+  async function loadWlCard(ticker){
+    const card = watchlistGrid.querySelector(`.wl-card[data-ticker="${CSS.escape(ticker)}"]`);
+    if (!card) return;
+    try{
+      const data = await fetchPredict(ticker);
+      card.innerHTML = wlCardContent(ticker, data);
+    } catch(err){
+      card.innerHTML = wlCardError(ticker);
+    }
+    bindCardEvents(card, ticker);
+  }
+
+  function bindCardEvents(card, ticker){
+    const refreshBtn = card.querySelector(".wl-refresh");
+    const removeBtn = card.querySelector(".wl-remove");
+
+    refreshBtn.addEventListener("click", async () => {
+      refreshBtn.classList.add("spinning");
+      refreshBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>`;
+      try{
+        const data = await fetchPredict(ticker);
+        card.innerHTML = wlCardContent(ticker, data);
+      } catch(err){
+        card.innerHTML = wlCardError(ticker);
+      }
+      bindCardEvents(card, ticker);
+    });
+
+    removeBtn.addEventListener("click", () => {
+      watchlist = watchlist.filter(t => t !== ticker);
+      saveWatchlist(watchlist);
+      renderWatchlistGrid();
+    });
+  }
+
+  addToggle.addEventListener("click", () => {
+    addForm.classList.toggle("show");
+    if (addForm.classList.contains("show")) addInput.focus();
+  });
+
+  function addTicker(){
+    const val = addInput.value.trim().toUpperCase();
+    if (!val) return;
+    if (watchlist.includes(val)) { addInput.value = ""; return; }
+    watchlist.push(val);
+    saveWatchlist(watchlist);
+    addInput.value = "";
+    addForm.classList.remove("show");
+    renderWatchlistGrid();
+  }
+
+  addConfirm.addEventListener("click", addTicker);
+  addInput.addEventListener("keydown", e => { if (e.key === "Enter") addTicker(); });
+
+  // ---------- init ----------
+  renderWatchlistGrid();
+})();
+</script>
+</body>
+</html>

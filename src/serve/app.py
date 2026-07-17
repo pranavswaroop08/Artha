@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import os
 import time
+from pathlib import Path
 
 import pandas as pd
 from fastapi import FastAPI, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse, HTMLResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from .models import ContributingFactor, PredictionRequest, PredictionResponse
@@ -24,7 +26,26 @@ from ..models.ml.lightgbm_trainer import LightGBMTrainer
 logger = get_logger(__name__)
 
 app = FastAPI(title="Artha Quant Platform API", version="0.1.0")
+
+# Allow the frontend (opened via file:// or any origin in local dev) to call the API.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 llm_client = MockLLMClient()
+
+# Serve the frontend HTML at the root URL so the browser and API share one origin.
+FRONTEND_HTML = Path(__file__).resolve().parents[2] / "frontend" / "index.html"
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def serve_frontend():
+    if FRONTEND_HTML.exists():
+        return HTMLResponse(content=FRONTEND_HTML.read_text(encoding="utf-8"))
+    return HTMLResponse(content="<h2>Artha API is running. Frontend not found at frontend/index.html</h2>")
+
 
 # Optional real model bundle; falls back to mock when absent.
 MODEL_PATH = os.environ.get("ARTHA_MODEL_PATH")
