@@ -203,7 +203,7 @@ quant-platform/            ← this repo root
 - **Feature families** — `features/{momentum,volatility,volume}.py` (returns, RSI, rolling vol, ATR, volume MAs/ratio), strictly backward-looking.
 - **Leakage CI harness** — `tests/leakage/test_future_leak.py` actively injects timestamp + shift(-1) leakage and asserts the PIT gate catches it.
 
-**Test suite (real counts, `python -m pytest`): 54 passed.**
+**Test suite (real counts, `python -m pytest`): 105 passed.**
 
 | File | Tests |
 |---|---|
@@ -217,11 +217,21 @@ quant-platform/            ← this repo root
 | tests/unit/test_features.py | 4 |
 | tests/unit/test_pit.py | 9 |
 | tests/unit/test_targets.py | 6 |
+| tests/unit/test_walk_forward.py | 9 |
+| tests/unit/test_lightgbm_trainer.py | 5 |
+| tests/unit/test_llm_client.py | 8 |
+| tests/unit/test_backtest_engine.py | 7 |
+| tests/unit/test_serve.py | 11 |
+| tests/unit/test_monitoring.py | 4 |
+| tests/unit/test_conformal.py | 11 |
+
+**CI:** `.github/workflows/ci.yml` runs the **full unit suite + the leakage (Rule A) harness** on every push/PR (Python 3.11). Nothing merges green unless both pass.
 
 **Known caveats (read before claiming "it works"):**
 - **Docker is NOT installed in the dev environment.** `docker compose up` and `alembic upgrade head` against a live TimescaleDB have **not been runtime-tested**. Configs/migrations are written and syntactically valid, but unverified at execution.
 - **No real market data flows yet.** All collectors (NSE/BSE/YF) and the corporate-actions client use deterministic **mock** providers so dev/tests run with **zero credentials**. This is intentional.
 - **Cost model constants** approximate current discount-broker + regulatory rates; verify against live SEBI/exchange schedules before real PnL attribution.
+- **Serving is mock by default.** `/predict` serves a deterministic mock unless `ARTHA_MODEL_PATH` points to a trained joblib bundle (then it serves real point forecasts + split-conformal return intervals).
 - `gh` CLI is not installed; pushes done via `git` directly.
 
 ---
@@ -241,7 +251,7 @@ make dev-up                             # pg/timescale, redis, minio, qdrant, ml
 make migrate                            # alembic upgrade head  (needs the stack)
 
 # 4. Tests (NO external services required — uses mock provider + tmp paths)
-python -m pytest -q                    # → 54 passed
+python -m pytest -q                    # → 105 passed (unit + leakage Rule-A harness)
 
 # 5. Run the first collector (no creds needed)
 python -c "
@@ -339,4 +349,4 @@ NSE · BSE · Yahoo Finance (backup) · corporate actions · financial statement
 
 ## 12. One-line summary for an agent
 
-> *Build a hedge-fund-grade, explainable NSE/BSE forecasting platform that outputs calibrated up/down probabilities + expected return + risk, with point-in-time leakage discipline and Indian cost modeling as hard constraints. Phase 0 (foundation) and Phase 1 (PIT + lineage, BSE/YF collectors, Feast foundation, targets, corporate actions, Indian cost model, feature families, leakage CI harness) are complete and tested — 54 tests green. Phase 2 (model training, walk-forward CV, backtest engine, ensemble) is the next milestone.*
+> *Build a hedge-fund-grade, explainable NSE/BSE forecasting platform that outputs calibrated up/down probabilities + expected return + risk, with point-in-time leakage discipline and Indian cost modeling as hard constraints. Phase 0 (foundation) and Phase 1 (PIT + lineage, BSE/YF collectors, Feast foundation, targets, corporate actions, Indian cost model, feature families, leakage CI harness) are complete and tested. Phase 2 (walk-forward CV, LightGBM trainer + conformal intervals, LLM interface, backtest engine, FastAPI serving, Prometheus monitoring, CI workflow) is built against mocks — **105 tests green**. Remaining: real vendor data, DL/ensemble (TFT/PatchTST), paper-trading execution, K8s deploy.*
