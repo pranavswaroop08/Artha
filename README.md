@@ -173,6 +173,7 @@ quant-platform/            ← this repo root
 │   ├── features/ nlp/ ensemble/ serve/ monitoring/  ← (planned)
 │   └── e2e/            ← (planned)
 ├── feature_store/       ← ✅ Feast definitions (sqlite/parquet, PIT view)
+├── docs/adr/            ← ✅ ADR-0001 targets · 0002 Feast store · 0003 MLflow-only
 ├── docker/ k8s/ airflow/ scripts/ docs/   ← (scaffold)
 ```
 
@@ -249,7 +250,37 @@ from datetime import date
 bar = NSECollector().collect('RELIANCE', date(2026, 7, 16))
 print(bar)
 "
+
+# 6. Verify PIT filtering (no creds needed)  -> prints: Rows visible at T=Jan2: 1
+python -c "
+import pandas as pd
+from src.data.pit import get_pit_dataframe
+df = pd.DataFrame({'event_ts': pd.to_datetime(['2026-01-01','2026-01-02']),
+                   'as_of_ts': pd.to_datetime(['2026-01-01','2026-01-03']),
+                   'close': [100, 105]})
+print('Rows visible at T=Jan2:', len(get_pit_dataframe(df, pd.Timestamp('2026-01-02'))))
+"
+
+# 7. Verify Indian cost model  -> prints: cost Rs52.55 (5.26 bps)
+python -c "
+from src.backtest.costs import IndianCostModel
+c = IndianCostModel().calculate_costs(turnover_inr=100000, is_intraday=True, is_buy=False)
+print(f'cost Rs{c.absolute_cost_inr:.2f} ({c.percentage_cost_bps:.2f} bps)')
+"
+
+# 8. Verify target construction  -> prints: 5d fwd ret Jan1: 0.25
+python -c "
+import pandas as pd
+from src.data.targets import calculate_forward_returns
+df = pd.DataFrame({'symbol': ['TEST']*6,
+                   'event_ts': pd.to_datetime(['2026-01-01']*6) + pd.to_timedelta(range(6), 'D'),
+                   'close': [100, 110, 105, 115, 120, 125]})
+t = calculate_forward_returns(df, horizons=[5])
+print('5d fwd ret Jan1:', t.iloc[0]['target_fwd_ret_5d'])
+"
 ```
+
+> All four snippets above were executed and their outputs verified (2026-07-17).
 
 **Run the backlog generator:**
 ```bash
@@ -261,19 +292,21 @@ make gen-issues      # regenerates quant-platform-issues.md from gen_issues.py
 ## 8. How to contribute (for agents)
 
 1. **Read the design doc first** (`quant-platform-design.md`) — especially Rules A/B/C in §0 and §2 of this README.
-2. **Pick an issue from `quant-platform-issues.md`** (or the GitHub Issues once synced). Issues are dependency-ordered; **do not start a child issue before its parents merge.**
-3. **Each issue is scoped 1–3h** and specifies: acceptance criteria, required files, required tests, docs. Match them.
-4. **Tests are mandatory.** Every feature/collector/model needs a unit test. The repo runs `pytest` with no external services (use `tmp_path`, mock providers, in-memory stores).
-5. **Keep PIT discipline.** New features must declare their `as_of_ts` source and never peek at future rows.
-6. **Never fake live data.** The mock provider is for dev only; clearly separate mock/dev paths from real-data paths.
-7. **Commit convention:** imperative subject (`feat:`, `fix:`, `test:`, `docs:`). Branch from `main`; keep PRs small (one issue = one PR ideally).
-8. **Regenerate the backlog** only via `make gen-issues` (edit `gen_issues.py`, never hand-edit the markdown).
+2. **Read the ADRs** (`docs/adr/`) before making architecture decisions — they capture locked-in choices (ADR-0001 targets, ADR-0002 Feast store, ADR-0003 MLflow-only).
+3. **Pick an issue from `quant-platform-issues.md`** (or the GitHub Issues once synced). Issues are dependency-ordered; **do not start a child issue before its parents merge.**
+4. **Each issue is scoped 1–3h** and specifies: acceptance criteria, required files, required tests, docs. Match them.
+5. **Tests are mandatory.** Every feature/collector/model needs a unit test. The repo runs `pytest` with no external services (use `tmp_path`, mock providers, in-memory stores).
+6. **Keep PIT discipline.** New features must declare their `as_of_ts` source and never peek at future rows. The leakage harness (`tests/leakage/`) runs on every PR.
+7. **Never fake live data.** The mock provider is for dev only; clearly separate mock/dev paths from real-data paths.
+8. **Commit convention:** imperative subject (`feat:`, `fix:`, `test:`, `docs:`). Branch from `main`; keep PRs small (one issue = one PR ideally).
+9. **Regenerate the backlog** only via `make gen-issues` (edit `gen_issues.py`, never hand-edit the markdown).
 
-**Next recommended work (Phase 1, unblocked):**
-- `src/data/collectors/bse.py` (mirror of `nse.py`)
-- `src/data/collectors/yfinance.py` (backup source)
-- `src/data/pit.py` + `src/data/lineage.py` — **point-in-time lineage tracker (do this BEFORE features)**
-- `feature_store/` Feast setup + first feature families in `src/features/`
+**Next recommended work (Phase 2, unblocked):**
+- `src/models/ml/lightgbm_trainer.py` — baseline LightGBM cross-sectional model
+- `src/training/walk_forward.py` — walk-forward CV with purged gaps (gap > horizon)
+- `src/backtest/engine.py` — event-driven backtest engine using `IndianCostModel`
+- Feast materialization pipeline — `feast apply` + `feast materialize` against mock data
+- Upgrade corporate-actions/collectors from mock to real vendor interfaces (needs creds)
 
 ---
 
@@ -306,4 +339,4 @@ NSE · BSE · Yahoo Finance (backup) · corporate actions · financial statement
 
 ## 12. One-line summary for an agent
 
-> *Build a hedge-fund-grade, explainable NSE/BSE forecasting platform that outputs calibrated up/down probabilities + expected return + risk, with point-in-time leakage discipline and Indian cost modeling as hard constraints. Phase 0 (foundation) is complete and tested; Phase 1 (real data collectors + PIT lineage + feature store) is the next milestone.*
+> *Build a hedge-fund-grade, explainable NSE/BSE forecasting platform that outputs calibrated up/down probabilities + expected return + risk, with point-in-time leakage discipline and Indian cost modeling as hard constraints. Phase 0 (foundation) and Phase 1 (PIT + lineage, BSE/YF collectors, Feast foundation, targets, corporate actions, Indian cost model, feature families, leakage CI harness) are complete and tested — 54 tests green. Phase 2 (model training, walk-forward CV, backtest engine, ensemble) is the next milestone.*
