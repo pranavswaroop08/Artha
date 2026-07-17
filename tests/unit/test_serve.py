@@ -18,10 +18,50 @@ REQUIRED_FIELDS = [
 ]
 
 
-def test_health_check():
+def test_health_still_works_with_middleware():
     r = client.get("/health")
     assert r.status_code == 200
     assert r.json() == {"status": "healthy"}
+
+
+def test_real_model_serves_conformal_intervals(tmp_path, monkeypatch):
+    """When ARTHA_MODEL_PATH is set, /predict uses real conformal CIs."""
+    import pandas as pd
+    import numpy as np
+    from src.models.ml.lightgbm_trainer import LightGBMTrainer
+    from src.training.walk_forward import WalkForwardCV
+
+    rng = np.random.default_rng(3)
+    n = 360
+    df = pd.DataFrame({
+        "symbol": ["T"] * n,
+        "event_ts": pd.date_range("2026-01-01", periods=n),
+        "feat_x": rng.normal(0, 1, n),
+        "feat_y": rng.normal(0, 1, n),
+    })
+    z = df["feat_x"] * 1.0 - df["feat_y"] * 0.5
+    df["target_fwd_ret_5d"] = ((z - z.mean()) / z.std()) * 0.05
+    df["target_fwd_ret_5d"] = df["target_fwd_ret_5d"].shift(-5)
+
+    tr = LightGBMTrainer(target_col="target_fwd_ret_5d",
+                         feature_cols=["feat_x", "feat_y"])
+    cv = WalkForwardCV(n_splits=3, train_size_days=180, test_size_days=40, gap_days=5)
+    tr.train_and_evaluate(df, cv)
+    path = tmp_path / "m.joblib"
+    tr.save(str(path))
+
+    monkeypatch.setenv("ARTHA_MODEL_PATH", str(path))
+    from src.serve import app as serve_app
+    import importlib
+    importlib.reload(serve_app)
+    real_client = TestClient(serve_app.app)
+
+    r = real_client.post("/predict", json={"symbol": "RELIANCE", "as_of_ts": "2026-07-16T00:00:00Z"})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["model_version"] == "lgbm-conformal-0.1.0"
+    assert d["return_ci_low"] < d["return_ci_high"]
+    assert d["return_ci_low"] <= d["expected_return"] <= d["return_ci_high"]
 
 
 def test_predict_endpoint_schema():

@@ -20,6 +20,7 @@ from scipy.stats import pearsonr
 
 from ...common.context import get_logger
 from ...training.walk_forward import WalkForwardCV
+from .conformal import ConformalPredictor
 
 logger = get_logger(__name__)
 
@@ -48,11 +49,13 @@ class LightGBMTrainer:
         params: Optional[Dict[str, Any]] = None,
         n_estimators: int = 100,
         mlflow_experiment: Optional[str] = None,
+        conformal_alpha: float = 0.1,
     ):
         self.target_col = target_col
         self.feature_cols = feature_cols or []
         self.n_estimators = n_estimators
         self.mlflow_experiment = mlflow_experiment
+        self.conformal_alpha = conformal_alpha
         self.params = params or {
             "objective": "regression",
             "metric": "rmse",
@@ -62,6 +65,10 @@ class LightGBMTrainer:
             "n_jobs": 1,
             "seed": 42,
         }
+        self.model: Optional[lgb.LGBMRegressor] = None
+        self.oos_pred: List[float] = []
+        self.oos_true: List[float] = []
+        self.conformal: Optional[ConformalPredictor] = None
 
     def train_and_evaluate(
         self, df: pd.DataFrame, cv: WalkForwardCV
@@ -91,23 +98,28 @@ class LightGBMTrainer:
 
             model = lgb.LGBMRegressor(**self.params, n_estimators=self.n_estimators)
             model.fit(X_tr, y_tr)
+            self.model = model  # keep last fold's model for serving/predict
             preds = model.predict(X_te)
 
-            oos_pred.extend(preds)
-            oos_true.extend(y_te.to_numpy())
+            self.oos_pred.extend(preds)
+            self.oos_true.extend(y_te.to_numpy())
             fold_ic = _safe_ic(np.asarray(preds), y_te.to_numpy())
             fold_ics.append(fold_ic)
             logger.info("fold_metrics", fold=i + 1, oos_ic=round(fold_ic, 4),
                         n_test=len(y_te))
 
-        if not oos_true:
+        if not self.oos_true:
             raise ValueError("No folds produced test samples; check CV sizing.")
 
-        pred_arr = np.asarray(oos_pred)
-        true_arr = np.asarray(oos_true)
+        pred_arr = np.asarray(self.oos_pred)
+        true_arr = np.asarray(self.oos_true)
         rmse = float(np.sqrt(mean_squared_error(true_arr, pred_arr)))
         ic = _safe_ic(pred_arr, true_arr)
         mean_fold_ic = float(np.nanmean(fold_ics)) if fold_ics else float("nan")
+
+        # Conformal intervals calibrated on realized OOS residuals.
+        self.conformal = ConformalPredictor(alpha=self.conformal_alpha)
+        self.conformal.fit(true_arr, pred_arr)
 
         results = {
             "oos_rmse": rmse,
@@ -115,12 +127,68 @@ class LightGBMTrainer:
             "mean_fold_ic": mean_fold_ic,
             "n_folds": len(fold_ics),
             "n_test_samples": int(len(true_arr)),
+            "conformal_coverage": 1.0 - self.conformal_alpha,
+            "conformal_half_width": self.conformal._quantile(),
         }
         logger.info("oos_summary", **{k: (round(v, 6) if isinstance(v, float) else v)
                                       for k, v in results.items()})
 
         self._maybe_log_mlflow(results)
         return results
+
+    # ------------------------------------------------------------------ #
+    # Inference + persistence
+    # ------------------------------------------------------------------ #
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """Point forecast on a feature frame. Requires a trained model."""
+        if self.model is None:
+            raise RuntimeError("Model not trained; call train_and_evaluate first")
+        if not self.feature_cols:
+            self.feature_cols = [c for c in df.columns if c.startswith("feat_")]
+        X = df[self.feature_cols]
+        return np.asarray(self.model.predict(X), dtype=float)
+
+    def predict_interval(self, df: pd.DataFrame) -> list:
+        """Point forecast + conformal interval. Requires trained model+conformal."""
+        if self.conformal is None:
+            raise RuntimeError("Conformal not fit; call train_and_evaluate first")
+        return self.conformal.predict_batch(self.predict(df))
+
+    def save(self, path: str) -> None:
+        """Persist model + conformal state + metadata to a joblib bundle."""
+        import joblib  # lazy import
+
+        if self.model is None or self.conformal is None:
+            raise RuntimeError("Nothing to save; train_and_evaluate first")
+        bundle = {
+            "model": self.model,
+            "feature_cols": self.feature_cols,
+            "target_col": self.target_col,
+            "conformal_alpha": self.conformal_alpha,
+            "conformal_residuals": self.conformal._cal_residuals,
+            "conformal_coverage": 1.0 - self.conformal_alpha,
+            "conformal_half_width": self.conformal._quantile(),
+        }
+        joblib.dump(bundle, path)
+        logger.info("model_saved", path=path)
+
+    @classmethod
+    def load(cls, path: str) -> "LightGBMTrainer":
+        """Reload a saved bundle into a ready-to-predict trainer."""
+        import joblib  # lazy import
+
+        bundle = joblib.load(path)
+        trainer = cls(
+            target_col=bundle["target_col"],
+            feature_cols=list(bundle["feature_cols"]),
+            conformal_alpha=bundle["conformal_alpha"],
+        )
+        trainer.model = bundle["model"]
+        cp = ConformalPredictor(alpha=bundle["conformal_alpha"])
+        cp._cal_residuals = bundle["conformal_residuals"]
+        trainer.conformal = cp
+        logger.info("model_loaded", path=path)
+        return trainer
 
     def _maybe_log_mlflow(self, results: Dict[str, Any]) -> None:
         if not _MLFLOW:
