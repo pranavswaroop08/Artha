@@ -2,6 +2,28 @@
 
 Ordered by dependency. Each issue is scoped to 1-3h and independently completable given its prerequisites.
 
+## Progress log (updated 2026-07-17)
+
+**Phase 0 (foundation): ✅ complete, pushed to `Artha` (github.com/pranavswaroop08/artha).**
+config, structured logging + correlation-id, raw lake, symbol master, provider-agnostic NSE collector, validation contracts, Alembic Timescale migration, docker-compose, pyproject/pre-commit/Makefile.
+
+**Phase 1 (data pipeline + PIT + features): ✅ complete — 54 tests passing (real `pytest`).**
+- PIT & lineage: `src/data/pit.py`, `src/data/lineage.py`, `validate_pit_row`.
+- Collectors: provider-agnostic BSE + Yahoo Finance (`src/data/collectors/{bse,yfinance}.py`, mock clients + `collect_range`).
+- Feast foundation: `feature_store/feature_repo/` (sqlite online + file/parquet offline, `eod_market_data` view with `event_ts`/`as_of_ts`).
+- Targets: `src/data/targets.py` (`calculate_forward_returns`).
+- Corporate actions: `src/data/corporate_actions.py` (collector + `apply_adjustments`: splits & dividends, cumulative).
+- Indian cost model: `src/backtest/costs.py` (`IndianCostModel`).
+- Feature families: `src/features/{momentum,volatility,volume}.py`.
+- Leakage CI harness: `tests/leakage/test_future_leak.py`.
+
+Caveats: Docker not installed (compose/migrations unverified at runtime); all data providers are deterministic mocks (zero-credential dev); cost constants approximate current rates.
+
+**Next: Phase 2 — models (baseline + trainer), backtest event engine, ensemble, serving.**
+
+---
+
+
 ## Dependency key
 - `Depends on`: issue IDs that must be merged first.
 - `Est`: estimated effort (1-3h).

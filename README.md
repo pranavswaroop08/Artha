@@ -161,17 +161,18 @@ quant-platform/            ← this repo root
 │   ├── models/          ← (planned) ml/ + dl/ trainers
 │   ├── ensemble/        ← (planned)
 │   ├── training/        ← (planned) walk-forward, purged CV, leakage
-│   ├── backtest/        ← (planned) event engine, Indian cost model
+│   ├── backtest/        ← ✅ Indian cost model · (planned) event engine
 │   ├── trading/         ← (planned) paper + live engines
 │   ├── serve/           ← (planned) FastAPI, explainability
 │   ├── monitoring/      ← (planned)
 │   └── logging/         ← ✅ structured logging
 ├── tests/
-│   ├── unit/            ← ✅ test_common.py, test_data.py (10 tests, all pass)
+│   ├── unit/            ← ✅ 50 tests across common, data, pit, targets, collectors, corp-actions, costs, features, feast
+│   ├── leakage/         ← ✅ future-leak CI harness (4 tests)
 │   ├── integration/      ← (planned)
 │   ├── features/ nlp/ ensemble/ serve/ monitoring/  ← (planned)
 │   └── e2e/            ← (planned)
-├── feature_store/       ← (planned) Feast definitions
+├── feature_store/       ← ✅ Feast definitions (sqlite/parquet, PIT view)
 ├── docker/ k8s/ airflow/ scripts/ docs/   ← (scaffold)
 ```
 
@@ -185,15 +186,41 @@ quant-platform/            ← this repo root
 |---|---|
 | System design (18 subsystems) | ✅ done (`quant-platform-design.md`) |
 | 150-issue backlog | ✅ done (`quant-platform-issues.md`) |
-| **Phase 0 scaffold** | ✅ **done, 10 tests passing, pushed to `Artha`** |
-| Phase 1 (data pipeline) | ⬜ next |
-| Phase 2+ (features, models, backtest, ensemble, serving) | ⬜ not started |
+| **Phase 0 scaffold** | ✅ **done, pushed to `Artha`** |
+| **Phase 1 (data pipeline + PIT + features)** | ✅ **done, 54 tests passing** |
+| Phase 2+ (models, backtest, ensemble, serving) | ⬜ next |
 
 **Phase 0 delivered:** config (Hydra), structured logging + correlation-id, raw lake, symbol master, provider-agnostic NSE collector, validation contracts, Alembic Timescale migration, docker-compose stack, pyproject/pre-commit/Makefile, README.
 
+**Phase 1 delivered (all unit-tested, real `pytest` runs):**
+- **PIT & lineage** — `pit.py` (get_pit_dataframe, assert_no_future_leakage), `lineage.py` (LineageTracker, content hashing), `validate_pit_row`.
+- **Collectors** — provider-agnostic BSE + Yahoo Finance collectors (mock clients, `collect_range`), mirroring the NSE pattern.
+- **Feast foundation** — `feature_store/feature_repo/` with sqlite online + file(parquet) offline store (no Docker needed); `eod_market_data` FeatureView with `event_ts`/`as_of_ts` PIT columns.
+- **Targets** — `targets.py` `calculate_forward_returns` (per-symbol backward-shifted forward returns).
+- **Corporate actions** — `corporate_actions.py` collector + `apply_adjustments` (splits & dividends, cumulative).
+- **Indian cost model** — `backtest/costs.py` `IndianCostModel` (brokerage cap, STT, exchange, SEBI, stamp, GST, DP, ADV slippage).
+- **Feature families** — `features/{momentum,volatility,volume}.py` (returns, RSI, rolling vol, ATR, volume MAs/ratio), strictly backward-looking.
+- **Leakage CI harness** — `tests/leakage/test_future_leak.py` actively injects timestamp + shift(-1) leakage and asserts the PIT gate catches it.
+
+**Test suite (real counts, `python -m pytest`): 54 passed.**
+
+| File | Tests |
+|---|---|
+| tests/leakage/test_future_leak.py | 4 |
+| tests/unit/test_collectors.py | 6 |
+| tests/unit/test_common.py | 5 |
+| tests/unit/test_corporate_actions.py | 5 |
+| tests/unit/test_costs.py | 8 |
+| tests/unit/test_data.py | 5 |
+| tests/unit/test_feature_store.py | 2 |
+| tests/unit/test_features.py | 4 |
+| tests/unit/test_pit.py | 9 |
+| tests/unit/test_targets.py | 6 |
+
 **Known caveats (read before claiming "it works"):**
 - **Docker is NOT installed in the dev environment.** `docker compose up` and `alembic upgrade head` against a live TimescaleDB have **not been runtime-tested**. Configs/migrations are written and syntactically valid, but unverified at execution.
-- **No real NSE data flows yet.** The collector uses `MockNSEClient` (deterministic canned data) so dev/tests run with **zero credentials**. This is intentional.
+- **No real market data flows yet.** All collectors (NSE/BSE/YF) and the corporate-actions client use deterministic **mock** providers so dev/tests run with **zero credentials**. This is intentional.
+- **Cost model constants** approximate current discount-broker + regulatory rates; verify against live SEBI/exchange schedules before real PnL attribution.
 - `gh` CLI is not installed; pushes done via `git` directly.
 
 ---
@@ -213,7 +240,7 @@ make dev-up                             # pg/timescale, redis, minio, qdrant, ml
 make migrate                            # alembic upgrade head  (needs the stack)
 
 # 4. Tests (NO external services required — uses mock provider + tmp paths)
-python -m pytest -q                    # → 10 passed
+python -m pytest -q                    # → 54 passed
 
 # 5. Run the first collector (no creds needed)
 python -c "
