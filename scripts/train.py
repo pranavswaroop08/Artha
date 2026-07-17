@@ -62,6 +62,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--alpha", type=float, default=0.1)
     p.add_argument("--no-rank", action="store_true",
                    help="Skip cross-sectional rank normalisation.")
+    p.add_argument("--decay-halflife", type=float, default=504,
+                   help="Recency decay half-life in TRADING days for training "
+                        "sample weights (default 504 ~= 2y). 0 disables decay. "
+                        "Down-weights stale regime data to fight non-stationarity.")
     p.add_argument("--no-save", action="store_true")
     return p.parse_args()
 
@@ -162,6 +166,8 @@ def main() -> int:
     print(f"  Expanding win : {args.expanding}")
     print(f"  n_estimators  : {args.n_estimators}")
     print(f"  Conformal CI  : {(1-args.alpha)*100:.0f}%")
+    print(f"  Recency decay : {args.decay_halflife if args.decay_halflife > 0 else 'off'} "
+          f"trading-day half-life")
     print()
 
     # ── Walk-forward CV ────────────────────────────────────────────────────
@@ -184,6 +190,7 @@ def main() -> int:
         feature_cols=feat_cols,
         n_estimators=args.n_estimators,
         conformal_alpha=args.alpha,
+        decay_halflife_days=args.decay_halflife,
         mlflow_experiment="artha-lgbm-baseline",
         params={
             "objective":         "regression",
@@ -267,7 +274,10 @@ def main() -> int:
         out_path = Path(args.out)
         # Auto-name by target if using default
         if str(args.out) == str(DEFAULT_OUT) and "5d" not in args.target:
-            out_path = PROJECT_ROOT / "models" / f"lgbm_{out_tag}d.joblib"
+            tag = out_tag
+            if args.decay_halflife and args.decay_halflife > 0:
+                tag += f"_decay{int(args.decay_halflife)}"
+            out_path = PROJECT_ROOT / "models" / f"lgbm_{tag}d.joblib"
         out_path.parent.mkdir(parents=True, exist_ok=True)
         trainer.save(str(out_path))
         print()

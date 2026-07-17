@@ -68,6 +68,26 @@ def test_missing_target_raises(synthetic_data_with_signal):
         trainer.train_and_evaluate(synthetic_data_with_signal, cv)
 
 
+def test_results_include_fold_ics(synthetic_data_with_signal):
+    cv = WalkForwardCV(n_splits=3, train_size_days=200, test_size_days=40, gap_days=5)
+    trainer = LightGBMTrainer(feature_cols=["feat_x", "feat_y"])
+    res = trainer.train_and_evaluate(synthetic_data_with_signal, cv)
+    assert "fold_ics" in res
+    assert len(res["fold_ics"]) == 3
+
+
+def test_recency_decay_runs_and_is_deterministic(synthetic_data_with_signal):
+    """Recency decay (sample weights) must train without error and is stable."""
+    cv = WalkForwardCV(n_splits=3, train_size_days=200, test_size_days=40, gap_days=5)
+    t1 = LightGBMTrainer(feature_cols=["feat_x", "feat_y"], decay_halflife_days=504)
+    r1 = t1.train_and_evaluate(synthetic_data_with_signal, cv)
+    t2 = LightGBMTrainer(feature_cols=["feat_x", "feat_y"], decay_halflife_days=504)
+    r2 = t2.train_and_evaluate(synthetic_data_with_signal, cv)
+    # Deterministic given fixed seed.
+    assert r1["oos_ic"] == r2["oos_ic"]
+    assert r1["n_test_samples"] > 0
+
+
 def test_no_feature_cols_raises():
     df = pd.DataFrame(
         {

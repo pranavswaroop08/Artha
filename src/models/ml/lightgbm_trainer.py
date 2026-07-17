@@ -50,12 +50,14 @@ class LightGBMTrainer:
         n_estimators: int = 100,
         mlflow_experiment: Optional[str] = None,
         conformal_alpha: float = 0.1,
+        decay_halflife_days: Optional[float] = None,
     ):
         self.target_col = target_col
         self.feature_cols = feature_cols or []
         self.n_estimators = n_estimators
         self.mlflow_experiment = mlflow_experiment
         self.conformal_alpha = conformal_alpha
+        self.decay_halflife_days = decay_halflife_days
         self.params = params or {
             "objective": "regression",
             "metric": "rmse",
@@ -96,8 +98,17 @@ class LightGBMTrainer:
             X_tr, y_tr = train_df[self.feature_cols], train_df[self.target_col]
             X_te, y_te = test_df[self.feature_cols], test_df[self.target_col]
 
+            sw = None
+            if self.decay_halflife_days and self.decay_halflife_days > 0:
+                # Recency-weighted training: down-weight stale data within this
+                # fold's window via exponential decay from the train-end date.
+                # Attacks regime non-stationarity (signal flips across regimes).
+                train_end = train_df["event_ts"].max()
+                age_days = (train_end - train_df["event_ts"]).dt.days.clip(lower=0)
+                sw = (0.5 ** (age_days / self.decay_halflife_days)).to_numpy()
+
             model = lgb.LGBMRegressor(**self.params, n_estimators=self.n_estimators)
-            model.fit(X_tr, y_tr)
+            model.fit(X_tr, y_tr, sample_weight=sw)
             self.model = model  # keep last fold's model for serving/predict
             preds = model.predict(X_te)
 
@@ -125,6 +136,7 @@ class LightGBMTrainer:
             "oos_rmse": rmse,
             "oos_ic": ic,
             "mean_fold_ic": mean_fold_ic,
+            "fold_ics": fold_ics,
             "n_folds": len(fold_ics),
             "n_test_samples": int(len(true_arr)),
             "conformal_coverage": 1.0 - self.conformal_alpha,
@@ -165,6 +177,7 @@ class LightGBMTrainer:
             "feature_cols": self.feature_cols,
             "target_col": self.target_col,
             "conformal_alpha": self.conformal_alpha,
+            "decay_halflife_days": self.decay_halflife_days,
             "conformal_residuals": self.conformal._cal_residuals,
             "conformal_coverage": 1.0 - self.conformal_alpha,
             "conformal_half_width": self.conformal._quantile(),

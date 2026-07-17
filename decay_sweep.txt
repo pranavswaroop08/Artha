@@ -1,0 +1,5 @@
+halflife pooled_IC mean_fold_IC folds
+0 ERROR 'fold_ics'
+252 ERROR 'fold_ics'
+504 ERROR 'fold_ics'
+756 ERROR 'fold_ics'
